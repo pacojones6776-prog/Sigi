@@ -1465,37 +1465,29 @@ async function guardarJbFromApp(btn){
   }
 }
 
-// ── Inicializar JSONBin: conectar y crear bins si no existen ──
+// ── Inicializar JSONBin: crear bins y verificar clave ──
 async function initJb(key){
   if(!key) return false;
   try{
-    // Test: listar bins
-    var r = await fetch('https://api.jsonbin.io/v3/b', {
-      headers:{ 'X-Master-Key': key }
-    });
-    if(!r.ok) return false;
-    var bins = await r.json();
     _JB_KEY = key;
-
-    // Buscar o crear bin de incidencias
-    var incBin = bins.find(function(b){ return b.snippetMeta && b.snippetMeta.name === 'sigi_inc'; });
-    if(incBin){ _JB_INC = incBin.id; }
-    else{ _JB_INC = await jbCreate('sigi_inc', []); }
-
-    // Buscar o crear bin de usuarios
-    var usrBin = bins.find(function(b){ return b.snippetMeta && b.snippetMeta.name === 'sigi_usr'; });
-    if(usrBin){ _JB_USR = usrBin.id; }
-    else{ _JB_USR = await jbCreate('sigi_usr', []); }
-
-    // Buscar o crear bin de auditoria
-    var audBin = bins.find(function(b){ return b.snippetMeta && b.snippetMeta.name === 'sigi_aud'; });
-    if(audBin){ _JB_AUD = audBin.id; }
-    else{ _JB_AUD = await jbCreate('sigi_aud', []); }
-
-    // Guardar IDs
+    var c = getJbCreds();
+    // Si ya tenemos IDs guardados, solo verificar que la clave funciona
+    if(c.inc){
+      var r = await fetch('https://api.jsonbin.io/v3/b/' + c.inc + '/latest', {
+        headers:{ 'X-Master-Key': key, 'X-Bin-Meta': 'false' }
+      });
+      if(r.ok || r.status === 200){
+        _JB_INC = c.inc; _JB_USR = c.usr; _JB_AUD = c.aud;
+        return true;
+      }
+    }
+    // Crear bins nuevos
+    _JB_INC = await jbCreate('sigi_inc', []);
+    _JB_USR = await jbCreate('sigi_usr', []);
+    _JB_AUD = await jbCreate('sigi_aud', []);
     saveJbCreds(key, _JB_INC, _JB_USR, _JB_AUD);
     return true;
-  }catch(e){ console.warn('initJb fail:',e); return false; }
+  }catch(e){ console.warn('initJb fail:',e); _JB_KEY=''; return false; }
 }
 
 // ── Inicializar al arrancar ──
@@ -1578,14 +1570,14 @@ function closeModal(id){document.getElementById(id).classList.remove('open')}
 // JSONBin se inicializa en su propia seccion
 // ════════════════════════════════════════════════
 if(!localStorage.getItem('sigi_inc9')){
-  saveInc([
+  localStorage.setItem('sigi_inc9', JSON.stringify([
     {id:'INC-001',ini:'Carlos García',asi:'ALFA-1',ori:'Central',fec:'2025-04-10',hor:'08:30',has:'08:45',hlleg:'08:58',hfi:'10:15',dir:'Calle Mayor 12, Madrid',des:'Robo en establecimiento comercial',lat:40.4168,lon:-3.7038,est:'cerrada',tip:'robo',res:'pos_sol',notas:'[10/04/2025 10:15] Detenido el presunto autor in situ.',by:'agente1',files:[]},
     {id:'INC-002',ini:'María López',asi:'BRAVO-2',ori:'Ciudadano',fec:'2025-04-15',hor:'14:20',has:'14:35',hlleg:'14:50',hfi:'16:00',dir:'Av. Castellana 100, Madrid',des:'Accidente de tráfico con heridos leves',lat:40.435,lon:-3.69,est:'cerrada',tip:'accidente',res:'pos_nso',notas:'[15/04/2025 16:00] DAS atendió a los heridos.',by:'agente2',files:[]},
     {id:'INC-003',ini:'Administrador',asi:'ALFA-2',ori:'Patrulla',fec:'2025-05-01',hor:'22:10',has:'22:25',hlleg:'22:38',hfi:'',dir:'Plaza España 3, Madrid',des:'Altercado en vía pública',lat:40.423,lon:-3.713,est:'abierta',tip:'orden_publico',res:'',notas:'',by:'admin',files:[]},
     {id:'INC-004',ini:'María López',asi:'',ori:'112',fec:'2025-05-03',hor:'07:45',has:'',hlleg:'',hfi:'',dir:'Gran Vía 55, Madrid',des:'Carterismo zona turística, múltiples víctimas',lat:40.42,lon:-3.705,est:'prioritario',tip:'robo',res:'',notas:'',by:'agente2',files:[]},
     {id:'INC-005',ini:'Carlos García',asi:'DELTA-1',ori:'Central',fec:'2025-05-05',hor:'16:00',has:'16:15',hlleg:'16:29',hfi:'',dir:'Calle Alcalá 40, Madrid',des:'Persona desaparecida localizada sana y salva',lat:40.415,lon:-3.695,est:'asignada',tip:'desaparicion',res:'',notas:'',by:'agente1',files:[]},
     {id:'INC-006',ini:'Administrador',asi:'CHARLIE-3',ori:'112',fec:'2025-05-06',hor:'03:15',has:'03:20',hlleg:'03:28',hfi:'',dir:'Calle Fuencarral 80, Madrid',des:'Violencia doméstica, intervención urgente',lat:40.428,lon:-3.701,est:'prioritario',tip:'violencia',res:'',notas:'',by:'admin',files:[]},
-  ]);
+  ]));
 }
 
 // ════════════════════════════════════════════════
@@ -3039,7 +3031,7 @@ function importBackup(ev){
         'Por: '+(d.exportedBy||'desconocido')+'\n\n'+
         '¿Continuar con la restauración?';
       if(!confirm(msg)){ev.target.value='';return}
-      saveInc(d.incidencias);
+      localStorage.setItem('sigi_inc9', JSON.stringify(d.incidencias)); if(jbActive()) jbSet(_JB_INC, d.incidencias).catch(function(){});
       if(d.usuarios&&Array.isArray(d.usuarios))saveUsers(d.usuarios);
       if(d.auditoria&&Array.isArray(d.auditoria))saveAudit(d.auditoria);
       logAudit('backup_import','','Importadas '+d.incidencias.length+' incidencias desde '+(d.exported||'?'));
