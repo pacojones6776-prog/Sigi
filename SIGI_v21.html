@@ -1259,7 +1259,9 @@ async function jbGet(binId){
   });
   if(!r.ok) throw new Error('JB GET ' + r.status);
   var j = await r.json();
-  return Array.isArray(j) ? j : (j.record || j);
+  var arr = Array.isArray(j) ? j : (j.record || j);
+  if(Array.isArray(arr)) return arr.filter(function(x){ return !x._init; });
+  return arr;
 }
 async function jbSet(binId, data){
   var r = await fetch('https://api.jsonbin.io/v3/b/' + binId, {
@@ -1486,9 +1488,9 @@ async function initJb(key){
       }
     }
     // Crear bins nuevos
-    _JB_INC = await jbCreate('sigi_inc', []);
-    _JB_USR = await jbCreate('sigi_usr', []);
-    _JB_AUD = await jbCreate('sigi_aud', []);
+    _JB_INC = await jbCreate('sigi_inc', [{"_init":true}]);
+    _JB_USR = await jbCreate('sigi_usr', [{"_init":true}]);
+    _JB_AUD = await jbCreate('sigi_aud', [{"_init":true}]);
     saveJbCreds(key, _JB_INC, _JB_USR, _JB_AUD);
     return true;
   }catch(e){ console.warn('initJb fail:',e); _JB_KEY=''; return false; }
