@@ -1573,30 +1573,26 @@ function escHtml(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').rep
 function closeModal(id){document.getElementById(id).classList.remove('open')}
 
 // JSONBin se inicializa en su propia seccion
+// ════════════════════════════════════════════════
 
-function showP(name){
-  document.querySelectorAll('.panel').forEach(p=>p.style.display='none');
-  const el=document.getElementById('panel-'+name);
-  if(el)el.style.display='block';
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  const navEl=document.querySelector('.nav-item[data-panel="'+name+'"]');
-  if(navEl)navEl.classList.add('active');
-  if(name==='dashboard')renderDash();
-  if(name==='listado')renderLst();
-  if(name==='prioritario')renderPrio();
-  if(name==='mapa')setTimeout(()=>initMap(),150);
-  if(name==='usuarios')renderUsers();
-  if(name==='superadmin'){renderSAUsers();renderAudit();checkStorageSize();}
-  if(name==='directorio')renderDir();
-}
 
+// ════════════════════════════════════════════════
+//  AUTENTICACIÓN
+// ════════════════════════════════════════════════
 function doLogin(){
   const u=document.getElementById('lu').value.trim(),p=document.getElementById('lp').value.trim();
+  // Save API key if present in the login field
   const keyInp=document.getElementById('l-apikey');
   if(keyInp&&keyInp.value.trim())saveApiKey(keyInp.value.trim());
   const found=getUsers().find(x=>x.user===u&&x.pass===p);
   document.getElementById('login-err').style.display=found?'none':'block';
   if(found)loginAs(found);
+}
+function qlogin(u,p){
+  // Save API key if present before quick login
+  const keyInp=document.getElementById('l-apikey');
+  if(keyInp&&keyInp.value.trim())saveApiKey(keyInp.value.trim());
+  document.getElementById('lu').value=u;document.getElementById('lp').value=p;doLogin();
 }
 function loginAs(u){
   CU=u;
@@ -1609,32 +1605,79 @@ function loginAs(u){
   const isSA=u.role==='superadmin', isAdmin=u.role==='admin'||isSA;
   document.querySelectorAll('.ao').forEach(el=>el.style.display=isAdmin?'flex':'none');
   document.querySelectorAll('.ao-sa').forEach(el=>el.style.display=isSA?'flex':'none');
+  const iaVisible=isAdmin;
   const iakeyBtn=document.getElementById('ia-key-btn');
-  if(iakeyBtn)iakeyBtn.style.display=isAdmin?'flex':'none';
-  ['btn-ia-resumir','btn-ia-cierre','btn-ia-narrar'].forEach(function(id){
-    const el=document.getElementById(id);
-    if(el)el.style.display=isAdmin?'inline-flex':'none';
-  });
+  if(iakeyBtn)iakeyBtn.style.display=iaVisible?'flex':'none';
+  const iaResumirBtn=document.getElementById('btn-ia-resumir');
+  if(iaResumirBtn)iaResumirBtn.style.display=iaVisible?'inline-flex':'none';
+  const iaCierreBtn=document.getElementById('btn-ia-cierre');
+  if(iaCierreBtn)iaCierreBtn.style.display=iaVisible?'inline-flex':'none';
+  const iaNarrarBtn=document.getElementById('btn-ia-narrar');
+  if(iaNarrarBtn)iaNarrarBtn.style.display=iaVisible?'inline-flex':'none';
   document.getElementById('f-ini').value=u.name;
   document.getElementById('f-fec').value=todayDate();
   document.getElementById('f-hor').value=nowTime();
+  // Mostrar indicador de almacenamiento
   updateSyncIndicator(gsActive()?'cloud':'local');
   showP('dashboard');
   updatePrioDot();
   updateIaStatus();
-  logAudit('login','','Sesion iniciada como '+roleLabel);
+  logAudit('login','','Sesión iniciada como '+roleLabel);
   if(u.firstLogin) openChangePassModal(u);
-  if(gsActive()){ setTimeout(()=>syncFromGs(),400); }
+  // Sincronizar desde Supabase si está activo
+  if(gsActive()){
+    setTimeout(()=>syncFromGs(),400);
+  }
+}
+function openChangePassModal(u){
+  document.getElementById('chpass-username').textContent=u.name;
+  document.getElementById('chpass-new').value='';
+  document.getElementById('chpass-confirm').value='';
+  document.getElementById('chpass-msg').innerHTML='';
+  document.getElementById('modal-chpass').classList.add('open');
+}
+function confirmarCambioPass(){
+  const np=document.getElementById('chpass-new').value;
+  const cp=document.getElementById('chpass-confirm').value;
+  if(np.length<6){document.getElementById('chpass-msg').innerHTML='<div class="alert-err"><i class="ti ti-alert-circle"></i>La contraseña debe tener al menos 6 caracteres.</div>';return}
+  if(np!==cp){document.getElementById('chpass-msg').innerHTML='<div class="alert-err"><i class="ti ti-alert-circle"></i>Las contraseñas no coinciden.</div>';return}
+  const users=getUsers();
+  const idx=users.findIndex(x=>x.user===CU.user);
+  if(idx>=0){users[idx].pass=np;users[idx].firstLogin=false;saveUsers(users);CU=users[idx];}
+  document.getElementById('chpass-msg').innerHTML='<div class="alert-ok"><i class="ti ti-check"></i>Contraseña cambiada. Accediendo...</div>';
+  setTimeout(()=>{
+    document.getElementById('modal-chpass').classList.remove('open');
+  },1100);
 }
 function doLogout(){
-  if(CU)logAudit('logout','','Sesion cerrada');
+  if(CU)logAudit('logout','','Sesión cerrada');
   CU=null;
   document.getElementById('app').style.display='none';
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('lu').value='';
   document.getElementById('lp').value='';
   mapInst=null;heatLay=null;
-  updateSyncIndicator('local');
+}
+function updatePrioDot(){
+  const n=getInc().filter(i=>i.est==='prioritario').length;
+  document.getElementById('prio-dot').style.display=n>0?'block':'none';
+}
+
+// ════════════════════════════════════════════════
+//  NAVEGACIÓN
+// ════════════════════════════════════════════════
+function showP(name){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  document.querySelectorAll('.ntab').forEach(t=>{if((t.getAttribute('onclick')||'').includes("'"+name+"'"))t.classList.add('active')});
+  if(name==='dashboard')renderDash();
+  if(name==='listado')renderLst();
+  if(name==='prioritario')renderPrio();
+  if(name==='mapa')setTimeout(()=>initMap(),150);
+  if(name==='usuarios')renderUsers();
+  if(name==='superadmin'){renderSAUsers();renderAudit();checkStorageSize();}
+  if(name==='directorio')renderDir();
 }
 
 // ════════════════════════════════════════════════
