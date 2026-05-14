@@ -1590,6 +1590,53 @@ function showP(name){
   if(name==='directorio')renderDir();
 }
 
+function doLogin(){
+  const u=document.getElementById('lu').value.trim(),p=document.getElementById('lp').value.trim();
+  const keyInp=document.getElementById('l-apikey');
+  if(keyInp&&keyInp.value.trim())saveApiKey(keyInp.value.trim());
+  const found=getUsers().find(x=>x.user===u&&x.pass===p);
+  document.getElementById('login-err').style.display=found?'none':'block';
+  if(found)loginAs(found);
+}
+function loginAs(u){
+  CU=u;
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').style.display='flex';
+  document.getElementById('u-av').textContent=u.initials||u.name.slice(0,2).toUpperCase();
+  document.getElementById('u-name').textContent=u.name;
+  const roleLabel=u.role==='superadmin'?'Superadministrador':u.role==='admin'?'Administrador':'Agente';
+  document.getElementById('u-role').textContent=roleLabel;
+  const isSA=u.role==='superadmin', isAdmin=u.role==='admin'||isSA;
+  document.querySelectorAll('.ao').forEach(el=>el.style.display=isAdmin?'flex':'none');
+  document.querySelectorAll('.ao-sa').forEach(el=>el.style.display=isSA?'flex':'none');
+  const iakeyBtn=document.getElementById('ia-key-btn');
+  if(iakeyBtn)iakeyBtn.style.display=isAdmin?'flex':'none';
+  ['btn-ia-resumir','btn-ia-cierre','btn-ia-narrar'].forEach(function(id){
+    const el=document.getElementById(id);
+    if(el)el.style.display=isAdmin?'inline-flex':'none';
+  });
+  document.getElementById('f-ini').value=u.name;
+  document.getElementById('f-fec').value=todayDate();
+  document.getElementById('f-hor').value=nowTime();
+  updateSyncIndicator(gsActive()?'cloud':'local');
+  showP('dashboard');
+  updatePrioDot();
+  updateIaStatus();
+  logAudit('login','','Sesion iniciada como '+roleLabel);
+  if(u.firstLogin) openChangePassModal(u);
+  if(gsActive()){ setTimeout(()=>syncFromGs(),400); }
+}
+function doLogout(){
+  if(CU)logAudit('logout','','Sesion cerrada');
+  CU=null;
+  document.getElementById('app').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('lu').value='';
+  document.getElementById('lp').value='';
+  mapInst=null;heatLay=null;
+  updateSyncIndicator('local');
+}
+
 // ════════════════════════════════════════════════
 //  DASHBOARD
 // ════════════════════════════════════════════════
