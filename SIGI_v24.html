@@ -1511,12 +1511,14 @@ async function doLogin(){
   const u=document.getElementById('lu').value.trim(),p=document.getElementById('lp').value.trim();
   const keyInp=document.getElementById('l-apikey');
   if(keyInp&&keyInp.value.trim())saveApiKey(keyInp.value.trim());
-  // Si JSONBin activo, sincronizar usuarios antes de verificar
-  if(jbActive() && _JB_USR){
+  // Cargar usuarios desde Firebase antes de verificar
+  if(fbActive()){
     try{
-      const remoteUsers = await jbGet(_JB_USR);
-      if(remoteUsers && remoteUsers.length) localStorage.setItem('sigi_users', JSON.stringify(remoteUsers));
-    }catch(e){ console.warn('No se pudieron cargar usuarios desde JSONBin:', e); }
+      var usrDoc = await _DB.collection('config').doc('usuarios').get();
+      if(usrDoc.exists && usrDoc.data().data){
+        localStorage.setItem('sigi_users', JSON.stringify(usrDoc.data().data));
+      }
+    }catch(e){ console.warn('No se pudieron cargar usuarios desde Firebase:', e); }
   }
   const found=getUsers().find(x=>x.user===u&&x.pass===p);
   document.getElementById('login-err').style.display=found?'none':'block';
